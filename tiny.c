@@ -51,7 +51,7 @@ void enQueueJob(int connfd)
     P(&jobSem);
     if((qRear+1) % MAXQSzie != qFront) {
         jobQue[qRear] = connfd;
-		qRear = (qRear + 1) % MAXQSzie;
+        qRear = (qRear + 1) % MAXQSzie;
     }else {
         clienterror(connfd,"too many connection's","-1","please wait","");
     }
@@ -65,11 +65,10 @@ void * deQueueJob(void *arg)
         P(&jobSem);
         if(qFront != qRear) {
             connfd = jobQue[qFront];
-			qFront = (qFront + 1) % MAXQSzie;
+            qFront = (qFront + 1) % MAXQSzie;
         }
         V(&jobSem);
         if(connfd > 0) {
-			printf("server for %d\n",connfd);
             doit(connfd);
             Close(connfd);
         }
