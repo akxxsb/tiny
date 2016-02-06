@@ -2,7 +2,7 @@
 #define MAXThreads 20   //线程池线程数
 #define MAXQSzie 1000   //工作队列限制
 
-int jobQue[MAXQSzie];   //工作队列
+int jobQue[MAXQSzie];           //工作队列
 int qFront,qRear;
 pthread_t thread[MAXThreads];   //线程id
 sem_t jobSem;                   //用于同步工作队列的信号量
@@ -104,26 +104,26 @@ void doit(int fd)
     /* 解析uri */
     is_static = parse_uri(uri, filename, cgiargs);
     if (stat(filename, &sbuf) < 0) {
-	clienterror(fd, filename, "404", "Not found",
-		    "Tiny couldn't find this file");
-	return;
+        clienterror(fd, filename, "404", "Not found",
+                "Tiny couldn't find this file");
+        return;
     }
 
     if (is_static) { /* 服务静态内容 */
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't read the file");
-	    return;
-	}
-	serve_static(fd, filename, sbuf.st_size);
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
+            clienterror(fd, filename, "403", "Forbidden",
+                "Tiny couldn't read the file");
+            return;
+        }
+        serve_static(fd, filename, sbuf.st_size);
     }
     else { /*服务动态内容 */
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't run the CGI program");
-	    return;
-	}
-	serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
+            clienterror(fd, filename, "403", "Forbidden",
+                "Tiny couldn't run the CGI program");
+            return;
+        }
+        serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
     }
 }
 /* $end doit */
