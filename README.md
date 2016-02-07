@@ -9,10 +9,10 @@ author: <1319132622@qq.com>
    
 
 #### 文件说明：  
-  csapp.c对unix常见函数进行了包装，提供了错误处理。  
-  csapp.h提供csapp.c的函数原型。  
-  sbuf.c用结构实现了一个线程池。  
-  subf.h提供sbuf.c里的结构和函数原型  
-  tiny.c服务器主程序,实现服务器的主要功能
-  /cgi-bin/adder.c 主要用于生成adder cgi程序.
-  其他文件用于提供静态服务
+  * csapp.c对unix常见函数进行了包装，提供了错误处理。  
+  * csapp.h提供csapp.c的函数原型。  
+  * sbuf.c用结构实现了一个线程池。  
+  * subf.h提供sbuf.c里的结构和函数原型  
+  * tiny.c服务器主程序,实现服务器的主要功能
+  * /cgi-bin/adder.c 主要用于生成adder cgi程序.
+  * 其他文件用于提供静态服务
