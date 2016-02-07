@@ -1,11 +1,9 @@
 #include "csapp.h"
-#define MAXThreads 20   //线程池线程数
-#define MAXQSzie 1000   //工作队列限制
+#include "sbuf.h"
+const int MAXThreads  = 20;     //线程池线程数
+const int bufferSize  = 1000;   //buffer大小限制
 
-int jobQue[MAXQSzie];           //工作队列
-int qFront,qRear;
-pthread_t thread[MAXThreads];   //线程id
-sem_t jobSem;                   //用于同步工作队列的信号量
+sbuf_t sbuf;                    //用于共享链接描述符的buffer
 
 void doit(int fd);                                              //处理fd的请求
 void read_requesthdrs(rio_t *rp);                               //  处理表头
@@ -15,14 +13,14 @@ void get_filetype(char *filename, char *filetype);              //获取文件�
 void serve_dynamic(int fd, char *filename, char *cgiargs);      //提供动态服务
 void clienterror(int fd, char *cause, char *errnum,             //构造错误信息
 		 char *shortmsg, char *longmsg);
-void * deQueueJob(void *arg);                                   //从工作队列里取出任务并处理
-void enQueueJob(int connfd);                                    //给队列加入工作
+void * thread(void * vargp);
 int main(int argc, char **argv)
 {
     int listenfd, connfd;
     char hostname[MAXLINE], port[MAXLINE];
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
+    pthread_t tid;
 
     if (argc != 2) {
         fprintf(stderr, "usage: %s <port>\n", argv[0]);
@@ -30,48 +28,29 @@ int main(int argc, char **argv)
     }
 
     listenfd = Open_listenfd(argv[1]);
-    qFront = qRear = 0;
-    Sem_init(&jobSem,0,1);//初始化信号量
+    sbuf_init(&sbuf, bufferSize);           //初始化结构
+    
     int i;
-    for(i = 0; i < MAXThreads; ++i) Pthread_create(&thread[i],NULL,deQueueJob,NULL);
+    for(i = 0; i < MAXThreads; ++i) Pthread_create(&tid,NULL,thread,NULL);
     while (1) {
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
             Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE,
                     port, MAXLINE, 0);
         printf("Accepted connection from (%s, %s)\n", hostname, port);
-        enQueueJob(connfd);
+        sbuf_insert(&sbuf, connfd);         //生产者加入描述符
     }
-    for(i = 0; i < MAXThreads; ++i) Pthread_join(thread[i],NULL);//等待子线程终止
+    sbuf_deinit(&sbuf);                     //释放buffer
     return 0;
 }
 
-void enQueueJob(int connfd)
+void * thread(void * vargp)
 {
-    P(&jobSem);
-    if((qRear+1) % MAXQSzie != qFront) {
-        jobQue[qRear] = connfd;
-        qRear = (qRear + 1) % MAXQSzie;
-    }else {
-        clienterror(connfd,"too many connection's","-1","please wait","");
-    }
-    V(&jobSem);
-}
-
-void * deQueueJob(void *arg)
-{
+    Pthread_detach(pthread_self());         //分离当前线程
     while(1) {
-        int connfd = -1;
-        P(&jobSem);
-        if(qFront != qRear) {
-            connfd = jobQue[qFront];
-            qFront = (qFront + 1) % MAXQSzie;
-        }
-        V(&jobSem);
-        if(connfd > 0) {
-            doit(connfd);
-            Close(connfd);
-        }
+        int connfd = sbuf_remove(&sbuf);    //从buffer取出描述符
+        doit(connfd);
+        Close(connfd);                      //关闭连接
     }
     return NULL;
 }
@@ -103,26 +82,26 @@ void doit(int fd)
     /* 解析uri */
     is_static = parse_uri(uri, filename, cgiargs);
     if (stat(filename, &sbuf) < 0) {
-        clienterror(fd, filename, "404", "Not found",
-                "Tiny couldn't find this file");
-        return;
+	clienterror(fd, filename, "404", "Not found",
+		    "Tiny couldn't find this file");
+	return;
     }
 
     if (is_static) { /* 服务静态内容 */
-        if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
-            clienterror(fd, filename, "403", "Forbidden",
-                "Tiny couldn't read the file");
-            return;
-        }
-        serve_static(fd, filename, sbuf.st_size);
+	if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
+	    clienterror(fd, filename, "403", "Forbidden",
+			"Tiny couldn't read the file");
+	    return;
+	}
+	serve_static(fd, filename, sbuf.st_size);
     }
     else { /*服务动态内容 */
-        if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-            clienterror(fd, filename, "403", "Forbidden",
-                "Tiny couldn't run the CGI program");
-            return;
-        }
-        serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
+	if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
+	    clienterror(fd, filename, "403", "Forbidden",
+			"Tiny couldn't run the CGI program");
+	    return;
+	}
+	serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
     }
 }
 /* $end doit */
